@@ -2125,6 +2125,22 @@ class H : public WriteBatch::Handler {
   void* state_;
   void (*put_)(void*, const char* k, size_t klen, const char* v, size_t vlen);
   void (*deleted_)(void*, const char* k, size_t klen);
+
+  void (*put_cf_)(void*, uint32_t column_family_id, const char* k, size_t klen,
+                                            const char* v, size_t vlen);
+  void (*deleted_cf_)(void*, uint32_t column_family_id,
+                     const char* k, size_t klen);
+
+  Status PutCF(uint32_t column_family_id, const Slice& key, const Slice& value) {
+    (*put_cf_)(state_, column_family_id, key.data(), key.size(), value.data(), value.size());
+    return Status::OK();  
+  }
+
+  Status DeleteCF(uint32_t column_family_id, const Slice& key) {
+    (*deleted_cf_)(state_, column_family_id, key.data(), key.size()); 
+    return Status::OK();  
+  }
+
   void Put(const Slice& key, const Slice& value) override {
     (*put_)(state_, key.data(), key.size(), value.data(), value.size());
   }
@@ -2142,6 +2158,24 @@ void rocksdb_writebatch_iterate(rocksdb_writebatch_t* b, void* state,
   handler.state_ = state;
   handler.put_ = put;
   handler.deleted_ = deleted;
+  b->rep.Iterate(&handler);
+}
+
+void rocksdb_writebatch_iterate_cf(rocksdb_writebatch_t* b, void* state,
+                                void (*put)(void*, const char* k, size_t klen,
+                                            const char* v, size_t vlen),
+                                void (*deleted)(void*, const char* k,
+                                                size_t klen),
+                                void (*put_cf)(void*, uint32_t column_family_id , const char* k, size_t klen,
+                                            const char* v, size_t vlen),
+                                void (*deleted_cf)(void*, uint32_t column_family_id, const char* k,
+                                                size_t klen)) {
+  H handler;
+  handler.state_ = state;
+  handler.put_ = put;
+  handler.deleted_ = deleted;
+  handler.put_cf_ = put_cf;
+  handler.deleted_cf_ = deleted_cf;
   b->rep.Iterate(&handler);
 }
 
